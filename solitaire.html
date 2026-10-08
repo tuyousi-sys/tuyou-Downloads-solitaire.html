@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ソリティア</title>
+<style>
+  :root { --felt:#1d5a43; --felt-d:#134032; --card:#fffdf8; --red:#c4283c; --blk:#1d2230; --gold:#f2c14e; --w:48px; --g:6px; }
+  :root:not([data-theme="light"]) { }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; }
+  body { background:radial-gradient(ellipse at top, var(--felt), var(--felt-d)); color:#fff; font-family:"Hiragino Sans","Yu Gothic",sans-serif;
+    padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+    touch-action:manipulation; user-select:none; -webkit-user-select:none; overflow:hidden; }
+  #bar { display:flex; align-items:center; justify-content:space-between; padding:6px 14px; font-size:18px; font-weight:700; }
+  #bar button { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:999px; padding:8px 20px; font-size:17px; }
+  #bar button:disabled { opacity:.4; }
+  #board { margin:0 auto; padding:0 var(--g) 40px; }
+  .row { display:grid; grid-template-columns:repeat(7, var(--w)); gap:var(--g); justify-content:center; margin-bottom:8px; }
+  .slot, .col { position:relative; width:var(--w); height:calc(var(--w)*1.4); border-radius:7px; }
+  .slot { border:2px dashed rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center; font-size:calc(var(--w)*.6); color:rgba(255,255,255,.4); }
+  .col { border:2px dashed rgba(255,255,255,.12); }
+  .card { position:absolute; left:0; width:var(--w); height:calc(var(--w)*1.4); background:var(--card); border-radius:7px; box-shadow:0 1px 3px rgba(0,0,0,.45);
+    font-weight:700; line-height:1; padding:calc(var(--w)*.05) calc(var(--w)*.06); }
+  .card b { display:block; font-size:calc(var(--w)*.42); letter-spacing:-.02em; white-space:nowrap; }
+  .card i { position:absolute; right:calc(var(--w)*.1); bottom:calc(var(--w)*.06); font-style:normal; font-size:calc(var(--w)*.62); }
+  .card.r { color:var(--red); } .card.b { color:var(--blk); }
+  .card.down { background:repeating-linear-gradient(45deg,#8f2d47,#8f2d47 5px,#a73a57 5px,#a73a57 10px); border:2px solid #fffdf8; }
+  .card.sel { outline:3px solid var(--gold); z-index:5; }
+  #win { position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; flex-direction:column; gap:18px; font-size:26px; z-index:20; }
+  #win button { background:var(--gold); color:#2b2200; border:none; border-radius:999px; padding:12px 28px; font-size:18px; font-weight:700; }
+  .land { display:flex; gap:14px; justify-content:center; align-items:flex-start; }
+  .land .row { margin-bottom:0; }
+  .side { display:flex; flex-direction:column; gap:var(--g); }
+  .side.fnd { display:grid; grid-template-columns:repeat(2, var(--w)); }
+  #board.l { padding-bottom:8px; }
+  #stage { position:relative; overflow:hidden; }
+  .card, .slot, .col, #board { cursor:pointer; }
+  .card *, .slot * { pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="bar"><span id="info">ソリティア</span><span><button id="undo">1つ戻す</button> <button id="new">新しいゲーム</button></span></div>
+<div id="board"></div>
+<div id="win"><div>🎉 クリア!</div><button onclick="deal()">もう1回</button></div>
+</div>
+<script>
+var SY=['♠','♥','♦','♣'], RK=['','A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+var G, H=[], sel=null, W=48;
+var red=function(c){return c.s==1||c.s==2;};
+
+function deal(){
+  var d=[]; for(var s=0;s<4;s++)for(var r=1;r<=13;r++)d.push({s:s,r:r,up:false});
+  for(var i=d.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=d[i];d[i]=d[j];d[j]=t;}
+  var tab=[]; for(var c=0;c<7;c++){tab.push(d.splice(0,c+1)); tab[c][c].up=true;}
+  G={stock:d,waste:[],found:[[],[],[],[]],tab:tab}; H=[]; sel=null;
+  document.getElementById('win').style.display='none'; render();
+}
+function snap(){ H.push(JSON.stringify(G)); if(H.length>200)H.shift(); }
+function cardsOf(s){
+  if(s.t=='w') return G.waste.slice(-1);
+  if(s.t=='t') return G.tab[s.i].slice(s.k);
+  return [];
+}
+function canTab(c,col){
+  if(!col.length) return c.r==13;
+  var top=col[col.length-1];
+  return top.up && red(top)!=red(c) && top.r==c.r+1;
+}
+function moveTo(dest){
+  if(!sel) return false;
+  var cs=cardsOf(sel); if(!cs.length) return false; var c=cs[0];
+  if(dest.t=='t'){
+    if(sel.t=='t' && sel.i==dest.i) return false;
+    if(!canTab(c,G.tab[dest.i])) return false;
+  } else {
+    if(cs.length!=1 || c.s!=dest.i || c.r!=G.found[dest.i].length+1) return false;
+  }
+  snap();
+  if(sel.t=='w') G.waste.pop(); else G.tab[sel.i].splice(sel.k);
+  if(sel.t=='t'){var src=G.tab[sel.i]; if(src.length) src[src.length-1].up=true;}
+  if(dest.t=='t') G.tab[dest.i]=G.tab[dest.i].concat(cs); else G.found[dest.i].push(c);
+  sel=null; render();
+  if(G.found.every(function(f){return f.length==13;})) document.getElementById('win').style.display='flex';
+  return true;
+}
+function auto(){
+  var cs=cardsOf(sel); if(!cs.length) return;
+  if(moveTo({t:'f',i:cs[0].s})) return;
+  for(var i=0;i<7;i++){ if(G.tab[i].length && moveTo({t:'t',i:i})) return; }
+  if(cs[0].r==13) for(var j=0;j<7;j++){ if(!G.tab[j].length && moveTo({t:'t',i:j})) return; }
+  sel=null; render();
+}
+function same(a,b){return a&&b&&a.t==b.t&&a.i==b.i&&a.k==b.k;}
+function tap(t,i,k){
+  var me={t:t,i:i,k:k};
+  if(t=='s'){
+    sel=null; snap();
+    if(G.stock.length){var c=G.stock.pop(); c.up=true; G.waste.push(c);}
+    else if(G.waste.length){G.stock=G.waste.reverse().map(function(c){c.up=false;return c;}); G.waste=[];}
+    else H.pop();
+    render(); return;
+  }
+  if(sel){
+    if(same(sel,me)){auto();return;}
+    if(t=='t' && moveTo({t:'t',i:i})) return;
+    if(t=='f' && moveTo({t:'f',i:i})) return;
+  }
+  if(t=='t' && !(G.tab[i][k]||{}).up){sel=null;render();return;}
+  sel=(t=='f')?null:me; render();
+}
+function render(){
+  var port=window.innerWidth<window.innerHeight;
+  var VW=port?window.innerHeight:window.innerWidth, VH=port?window.innerWidth:window.innerHeight;
+  var st=document.getElementById('stage');
+  if(port){
+    st.style.cssText='position:fixed;top:0;left:0;width:'+VW+'px;height:'+VH+'px;transform-origin:0 0;transform:translateX('+window.innerWidth+'px) rotate(90deg);overflow:auto;';
+  } else {
+    st.style.cssText='position:relative;width:100%;height:'+VH+'px;overflow-y:auto;overflow-x:hidden;';
+  }
+  var land=false;
+  var barH=document.getElementById('bar').offsetHeight;
+  var availH=VH-barH-18;
+  var g=6;
+  if(land){
+    W=Math.floor((VW-40-(7*g+28))/10);
+    W=Math.min(W,Math.floor((availH/2-g)/1.4),100);
+  } else {
+    W=Math.floor((VW-14)/7)-g;
+    W=Math.min(W,140,Math.floor((VH-barH-30)/2.6/1.4));
+  }
+  W=Math.max(34,W);
+  document.documentElement.style.setProperty('--w',W+'px');
+  var h=W*1.4, od0=W*.2, ou0=W*.42, i, k;
+  var colAvail=VH-barH-h-30;
+  var stockH='<div class="slot" data-t="s">'+(G.stock.length?'<div class="card down" style="top:0"></div>':'↻')+'</div>';
+  var wt=G.waste[G.waste.length-1];
+  var wasteH='<div class="slot" data-t="w">'+(wt?cardHTML(wt,0,sel&&sel.t=='w'):'')+'</div>';
+  var fH='';
+  for(i=0;i<4;i++){var f=G.found[i], fc=f[f.length-1];
+    fH+='<div class="slot" data-t="f" data-i="'+i+'">'+(fc?cardHTML(fc,0,false):SY[i])+'</div>';}
+  var tb='';
+  for(i=0;i<7;i++){
+    var col=G.tab[i], nd=0, nu=0;
+    for(k=0;k<col.length;k++){ if(col[k].up) nu++; else nd++; }
+    var nat=h+nd*od0+Math.max(0,nu-1)*ou0, fac=1;
+    if(nat>h && nat>colAvail) fac=Math.max(.2,Math.min(1,(colAvail-h)/(nat-h)));
+    var od=od0*fac, ou=ou0*fac, y=0, inner='';
+    for(k=0;k<col.length;k++){
+      var c=col[k], on=sel&&sel.t=='t'&&sel.i==i&&k>=sel.k;
+      inner+=cardHTML(c,y,on,'data-t="t" data-i="'+i+'" data-k="'+k+'"');
+      y+=c.up?ou:od;
+    }
+    var ht=col.length?(y-(col[col.length-1].up?ou:od)+h):h;
+    tb+='<div class="col" data-t="e" data-i="'+i+'" style="height:'+Math.max(h,ht)+'px">'+inner+'</div>';
+  }
+  var bd=document.getElementById('board');
+  if(land){
+    bd.className='l';
+    bd.innerHTML='<div class="land"><div class="side">'+stockH+wasteH+'</div><div class="row">'+tb+'</div><div class="side fnd">'+fH+'</div></div>';
+  } else {
+    bd.className='';
+    bd.innerHTML='<div class="row">'+stockH+wasteH+'<div></div>'+fH+'</div><div class="row">'+tb+'</div>';
+  }
+  document.getElementById('undo').disabled=!H.length;
+  var n=G.found.reduce(function(a,f){return a+f.length;},0);
+  document.getElementById('info').textContent='組札 '+n+' / 52';
+}
+function cardHTML(c,y,on,attr){
+  if(!c.up) return '<div class="card down" style="top:'+y+'px" '+(attr||'')+'></div>';
+  return '<div class="card '+(red(c)?'r':'b')+(on?' sel':'')+'" style="top:'+y+'px" '+(attr||'')+'><b>'+RK[c.r]+SY[c.s]+'</b><i>'+SY[c.s]+'</i></div>';
+}
+document.getElementById('board').addEventListener('click',function(e){
+  var el=e.target.closest('[data-t]'); if(!el) return;
+  var t=el.getAttribute('data-t'), i=+el.getAttribute('data-i'), k=el.getAttribute('data-k');
+  if(t=='e'){ if(sel) moveTo({t:'t',i:i}); return; }
+  if(t=='w'){ if(!G.waste.length) return; tap('w',0,0); return; }
+  if(t=='t') tap('t',i,+k); else tap(t,i,0);
+});
+document.getElementById('undo').onclick=function(){ if(H.length){G=JSON.parse(H.pop()); sel=null; render();} };
+document.getElementById('new').onclick=function(){ deal(); };
+window.addEventListener('resize',render);
+window.addEventListener('orientationchange',function(){setTimeout(render,200);});
+deal();
+</script>
+</body>
+</html>
