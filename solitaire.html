@@ -119,19 +119,15 @@ function rectsFor(sl){
   return out;
 }
 function glide(els,from){
-  var flip=true;
   if(!els.length||!from.length||!els[0].animate) return;
   els.forEach(function(el,n){
     var f=from[Math.min(n,from.length-1)]; if(!f) return;
     var r=el.getBoundingClientRect(), d=toStage(f.left-r.left,f.top-r.top);
-    var dx=d[0], dy=d[1], lift=Math.max(14,Math.min(34,Math.hypot(dx,dy)*.12));
-    var fl0=flip?' rotateY(88deg)':'', fl1=flip?' rotateY(24deg)':'', fl2=flip?' rotateY(0deg)':'';
     el.style.zIndex=60+n;
     var a=el.animate([
-      {transform:'perspective(800px) translate('+dx+'px,'+dy+'px)'+fl0+' scale(1)', boxShadow:'0 1px 3px rgba(0,0,0,.45)', offset:0},
-      {transform:'perspective(800px) translate('+(dx*.4)+'px,'+(dy*.4-lift)+'px)'+fl1+' scale(1.12)', boxShadow:'0 14px 22px rgba(0,0,0,.5)', offset:.55},
-      {transform:'perspective(800px) translate(0px,0px)'+fl2+' scale(1)', boxShadow:'0 1px 3px rgba(0,0,0,.45)', offset:1}
-    ],{duration:560+n*30,easing:'ease-in-out'});
+      {transform:'translate('+d[0]+'px,'+d[1]+'px)'},
+      {transform:'translate(0px,0px)'}
+    ],{duration:200,easing:'ease-out'});
     a.onfinish=a.oncancel=function(){ el.style.zIndex=''; };
   });
 }
@@ -211,7 +207,7 @@ function render(){
   }
   document.getElementById('undo').disabled=!H.length;
   var n=G.found.reduce(function(a,f){return a+f.length;},0);
-  document.getElementById('info').textContent='組札 '+n+' / 52   (v13)';
+  document.getElementById('info').textContent='組札 '+n+' / 52   (v14)';
 }
 function cardHTML(c,y,on,attr){
   if(!c.up) return '<div class="card down" style="top:'+y+'px" '+(attr||'')+'></div>';
